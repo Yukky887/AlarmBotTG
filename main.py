@@ -6,7 +6,7 @@ import time
 from threading import Thread
 from wakeonlan import send_magic_packet  # Импортируем библиотеку для Wake on LAN
 
-bot = telebot.TeleBot('7577820613:AAGz3c5Blm2z_XXsQXIlU4bMa3GcYDf3KfE')
+bot = telebot.TeleBot('...')
 
 # Словарь для хранения времени будильников
 user_alarms = {}
@@ -69,6 +69,9 @@ def start(message):
     bot.send_message(message.chat.id, f'Привет, {message.from_user.first_name} {message.from_user.last_name}',
                      reply_markup=markup)
 
+@bot.message_handler(func=lambda message: message.text == 'Help')
+def ask_time(message):
+    bot.send_message(message.chat.id, "Этот бот создан для включения компьютера в определённое время (по будильнику). Для работы бота, нужно подключить Wake-On-Lan и указать свой mac адрес")
 
 # Обработчик нажатий на кнопку "Завести будильник"
 @bot.message_handler(func=lambda message: message.text == 'Завести будильник')
