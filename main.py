@@ -7,7 +7,7 @@ import time
 from threading import Thread
 from wakeonlan import send_magic_packet  # Импортируем библиотеку для Wake on LAN
 
-bot = telebot.TeleBot('7577820613:AAGz3c5Blm2z_XXsQXIlU4bMa3GcYDf3KfE')
+bot = telebot.TeleBot('...')
 
 # Словарь для хранения времени будильников
 user_alarms = {}
@@ -16,7 +16,7 @@ user_alarms = {}
 user_states = {}
 
 # MAC-адрес компьютера для Wake on LAN (укажите правильный адрес)
-target_mac_address = '00-D8-61-DE-00-FF'  # Пример, замените на реальный MAC-адрес вашего компьютера
+target_mac_address = '00-00-00-00-00-00'  # Пример, замените на реальный MAC-адрес вашего компьютера
 
 # Функция для отправки уведомлений в заданное время
 def check_alarms():
