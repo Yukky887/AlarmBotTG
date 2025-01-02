@@ -2,12 +2,11 @@ import telebot
 from telebot import types
 from telebot.types import Message
 from datetime import datetime, timedelta
-import schedule
 import time
 from threading import Thread
 from wakeonlan import send_magic_packet  # Импортируем библиотеку для Wake on LAN
 
-bot = telebot.TeleBot('...')
+bot = telebot.TeleBot('7577820613:AAGz3c5Blm2z_XXsQXIlU4bMa3GcYDf3KfE')
 
 # Словарь для хранения времени будильников
 user_alarms = {}
@@ -15,8 +14,8 @@ user_alarms = {}
 # Используем словарь для хранения состояний пользователя
 user_states = {}
 
-# MAC-адрес компьютера для Wake on LAN (укажите правильный адрес)
-target_mac_address = '00-00-00-00-00-00'  # Пример, замените на реальный MAC-адрес вашего компьютера
+# Словарь для хранения MAC-адресов пользователей
+user_mac_addresses = {}
 
 # Функция для отправки уведомлений в заданное время
 def check_alarms():
@@ -31,8 +30,10 @@ def check_alarms():
             bot.send_photo(user_id, photo=file)
             bot.send_message(user_id, f"⏰ Время для вашего будильника: {user_alarms[user_id]}!")
 
-            # Отправляем magic packet для WOL
-            send_magic_packet(target_mac_address)  # Отправка magic packet
+            # Проверяем, если у пользователя есть MAC-адрес, отправляем magic packet
+            if user_id in user_mac_addresses:
+                target_mac_address = user_mac_addresses[user_id]
+                send_magic_packet(target_mac_address)  # Отправка magic packet
 
             del user_alarms[user_id]  # Удаляем будильник после его активации
 
@@ -57,7 +58,7 @@ def start(message):
     # Создание кнопок
     btn1 = types.KeyboardButton('Завести будильник')
     btn2 = types.KeyboardButton('Мой будильник')
-    btn3 = types.KeyboardButton('Мой домен')
+    btn3 = types.KeyboardButton('Мой mac')
     btn4 = types.KeyboardButton('Help')
 
     # Добавляем кнопки в строку
@@ -72,34 +73,13 @@ def start(message):
 # Обработчик нажатий на кнопку "Завести будильник"
 @bot.message_handler(func=lambda message: message.text == 'Завести будильник')
 def ask_time(message):
-    # В этом обработчике вызываем команду /set_alarm, как если бы пользователь сам её ввёл
-    bot.send_message(message.chat.id, 'Тык... /set_alarm')
-
-
-# Обработчик нажатий на кнопку "Мой будильник"
-@bot.message_handler(func=lambda message: message.text == 'Мой будильник')
-def show_alarms(message):
-    user_id = message.chat.id
-    if user_id in user_alarms:
-        alarm_time = user_alarms[user_id]
-        remaining_time = get_remaining_time(alarm_time)
-        bot.send_message(user_id, f"Ваш будильник установлен на {alarm_time}. Осталось спать: {remaining_time}.")
-    else:
-        bot.send_message(user_id, "У вас нет активных будильников.")
-
-
-# Обработчик команды /set_alarm
-@bot.message_handler(commands=['set_alarm'])
-def change(message):
     markup = types.InlineKeyboardMarkup()
 
-    # Создание кнопок с callback_data
     btn1 = types.InlineKeyboardButton('Ввести своё время', callback_data='write_time')
     btn2 = types.InlineKeyboardButton('Завести на 06:30', callback_data='06:30')
     btn3 = types.InlineKeyboardButton('Завести на 08:30', callback_data='08:30')
     btn4 = types.InlineKeyboardButton('Завести на 10:00', callback_data='10:00')
 
-    # Добавляем кнопки в строку
     markup.row(btn1)
     markup.row(btn2, btn3, btn4)
 
@@ -119,32 +99,47 @@ def handle_query(call):
     else:
         # Когда выбирают фиксированное время
         bot.answer_callback_query(call.id, f"Будильник установлен на {call.data}")
-        user_alarms[user_id] = call.data  # Сохраняем время будильника
+        user_alarms[user_id] = call.data
         remaining_time = get_remaining_time(call.data)
         bot.send_message(user_id, f"Будильник установлен на {call.data}. Осталось спать: {remaining_time}")
 
 
-# Функция для получения оставшегося времени до будильника
-def get_remaining_time(alarm_time: str) -> str:
-    # Текущее время
-    current_time = datetime.now()
-
-    # Время будильника
-    alarm_hour, alarm_minute = map(int, alarm_time.split(":"))
-    alarm_time = current_time.replace(hour=alarm_hour, minute=alarm_minute, second=0, microsecond=0)
-
-    # Если время будильника уже прошло, то добавляем 24 часа
-    if alarm_time < current_time:
-        alarm_time += timedelta(days=1)
-
-    # Рассчитываем разницу во времени
-    time_left = alarm_time - current_time
-    hours_left = time_left.seconds // 3600
-    minutes_left = (time_left.seconds // 60) % 60
-    return f"{hours_left} ч {minutes_left} мин"
+# Обработчик нажатий на кнопку "Мой будильник"
+@bot.message_handler(func=lambda message: message.text == 'Мой будильник')
+def show_alarms(message):
+    user_id = message.chat.id
+    if user_id in user_alarms:
+        alarm_time = user_alarms[user_id]
+        remaining_time = get_remaining_time(alarm_time)
+        bot.send_message(user_id, f"Ваш будильник установлен на {alarm_time}. Осталось спать: {remaining_time}.")
+    else:
+        bot.send_message(user_id, "У вас нет активных будильников.")
 
 
-# Обработчик текстовых сообщений для ввода времени вручную
+# Обработчик нажатий на кнопку "Мой mac" (для ввода/изменения MAC-адреса)
+@bot.message_handler(func=lambda message: message.text == 'Мой mac')
+def ask_mac_address(message):
+    user_id = message.chat.id
+    user_states[user_id] = 'waiting_for_mac_address'  # Устанавливаем состояние для ввода MAC-адреса
+    bot.send_message(user_id, "Введите MAC-адрес вашего компьютера в формате XX-XX-XX-XX-XX-XX:")
+
+
+# Обработчик для ввода MAC-адреса пользователем
+@bot.message_handler(func=lambda message: user_states.get(message.chat.id) == 'waiting_for_mac_address')
+def set_mac_address(message: Message):
+    user_id = message.chat.id
+    mac_address = message.text.strip()
+
+    # Проверяем, что MAC-адрес введён в правильном формате
+    if len(mac_address) == 17 and mac_address.count('-') == 5 and all(x.isalnum() for x in mac_address.split('-')):
+        user_mac_addresses[user_id] = mac_address  # Сохраняем MAC-адрес
+        bot.send_message(user_id, f"MAC-адрес успешно сохранён: {mac_address}")
+        user_states[user_id] = None  # Очищаем состояние
+    else:
+        bot.send_message(user_id, "Неверный формат MAC-адреса. Пожалуйста, введите в формате XX-XX-XX-XX-XX-XX.")
+
+
+# Обработчик для ввода времени будильника пользователем
 @bot.message_handler(func=lambda message: user_states.get(message.chat.id) == 'waiting_for_time')
 def set_alarm_time(message: Message):
     user_id = message.chat.id
@@ -168,6 +163,19 @@ def set_alarm_time(message: Message):
     else:
         bot.send_message(user_id, "Неверный формат времени. Введите время в формате HH:MM (например, 07:30).")
 
+
+# Функция для получения оставшегося времени до будильника
+def get_remaining_time(alarm_time: str) -> str:
+    current_time = datetime.now()
+    alarm_hour, alarm_minute = map(int, alarm_time.split(":"))
+    alarm_time = current_time.replace(hour=alarm_hour, minute=alarm_minute, second=0, microsecond=0)
+    if alarm_time < current_time:
+        alarm_time += timedelta(days=1)
+
+    time_left = alarm_time - current_time
+    hours_left = time_left.seconds // 3600
+    minutes_left = (time_left.seconds // 60) % 60
+    return f"{hours_left} ч {minutes_left} мин"
 
 # Обработчик всех остальных текстовых сообщений
 @bot.message_handler(func=lambda message: user_states.get(message.chat.id) is None)
