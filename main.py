@@ -6,7 +6,7 @@ import time
 from threading import Thread
 from wakeonlan import send_magic_packet  # Импортируем библиотеку для Wake on LAN
 
-bot = telebot.TeleBot('...')
+bot = telebot.TeleBot('')
 
 # Словарь для хранения времени будильников
 user_alarms = {}
@@ -79,9 +79,9 @@ def ask_time(message):
     markup = types.InlineKeyboardMarkup()
 
     btn1 = types.InlineKeyboardButton('Ввести своё время', callback_data='write_time')
-    btn2 = types.InlineKeyboardButton('Завести на 06:30', callback_data='06:30')
-    btn3 = types.InlineKeyboardButton('Завести на 08:30', callback_data='08:30')
-    btn4 = types.InlineKeyboardButton('Завести на 10:00', callback_data='10:00')
+    btn2 = types.InlineKeyboardButton('06:30', callback_data='06:30')
+    btn3 = types.InlineKeyboardButton('08:30', callback_data='08:30')
+    btn4 = types.InlineKeyboardButton('10:00', callback_data='10:00')
 
     markup.row(btn1)
     markup.row(btn2, btn3, btn4)
