@@ -1,3 +1,4 @@
+import os
 import telebot
 from telebot import types
 from telebot.types import Message
@@ -6,7 +7,9 @@ import time
 from threading import Thread
 from wakeonlan import send_magic_packet  # Импортируем библиотеку для Wake on LAN
 
-bot = telebot.TeleBot('')
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+bot = telebot.TeleBot(BOT_TOKEN)
 
 # Словарь для хранения времени будильников
 user_alarms = {}
