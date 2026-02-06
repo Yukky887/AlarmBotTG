@@ -1,4 +1,6 @@
 import os
+import socket
+import struct
 import telebot
 from telebot import types
 from telebot.types import Message
@@ -8,6 +10,9 @@ from threading import Thread
 from wakeonlan import send_magic_packet  # Импортируем библиотеку для Wake on LAN
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+WOL_TARGET_IP = os.getenv("WOL_TARGET_IP")
+WOL_TARGET_PORT = int(os.getenv("WOL_TARGET_PORT"))
+
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -20,28 +25,50 @@ user_states = {}
 # Словарь для хранения MAC-адресов пользователей
 user_mac_addresses = {}
 
-# Функция для отправки уведомлений в заданное время
+
+def send_wol(mac, ip, port=9):
+    """Отправка Magic Packet для WOL на конкретный IP и порт"""
+    # Преобразуем MAC в байты
+    mac_bytes = bytes.fromhex(mac.replace(":", "").replace("-", ""))
+    if len(mac_bytes) != 6:
+        raise ValueError("Неверный MAC-адрес")
+
+    # Формируем Magic Packet: 6 FF + 16 повторов MAC
+    packet = b'\xff' * 6 + mac_bytes * 16
+
+    # Создаем UDP сокет
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+    # Отправляем на указанный IP и порт
+    sock.sendto(packet, (ip, port))
+    sock.close()
+
+
 def check_alarms():
     while True:
-        current_time = datetime.now().strftime('%H:%M')  # Текущее время в формате HH:MM
-        # Собираем список пользователей, у которых сработал будильник
+        current_time = datetime.now().strftime('%H:%M')
         users_to_notify = [user_id for user_id, alarm_time in user_alarms.items() if alarm_time == current_time]
 
-        # Отправляем уведомления пользователям
         for user_id in users_to_notify:
-            file = open('./photo_cat.jpg', 'rb')
-            bot.send_photo(user_id, photo=file)
+            # Отправляем фото и сообщение
+            with open('./photo_cat.jpg', 'rb') as file:
+                bot.send_photo(user_id, photo=file)
             bot.send_message(user_id, f"⏰ Время для вашего будильника: {user_alarms[user_id]}!")
 
-            # Проверяем, если у пользователя есть MAC-адрес, отправляем magic packet
+            # Отправляем WOL, если есть MAC
             if user_id in user_mac_addresses:
                 target_mac_address = user_mac_addresses[user_id]
-                send_magic_packet(target_mac_address)  # Отправка magic packet
+                try:
+                    send_wol(target_mac_address, WOL_TARGET_IP, WOL_TARGET_PORT)
+                except Exception as e:
+                    bot.send_message(user_id, f"⚠️ Не удалось отправить Magic Packet: {e}")
 
-            del user_alarms[user_id]  # Удаляем будильник после его активации
+            # Удаляем будильник после срабатывания
+            del user_alarms[user_id]
 
-        time.sleep(60)  # Проверяем раз в минуту
-
+        time.sleep(60)
 
 # Запускаем проверку будильников в отдельном потоке
 def start_alarm_thread():
